@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="sonytv"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<thing-type id="tv">
+		<label>SonyTv Binding Thing</label>
+		<description>Sample thing for SonyTv Binding</description>
+
+		<channel-groups>
+			<channel-group id="video" typeId="video"/>
+			<channel-group id="system" typeId="system"/>
+		</channel-groups>
+
+		<config-description>
+			<parameter name="host" type="text" required="true">
+				<context>network-address</context>
+				<label>Hostname</label>
+				<description>Hostname or IP address of the device</description>
+			</parameter>
+			<parameter name="apiKey" type="text" required="true">
+				<context>password</context>
+				<label>apiKey</label>
+				<description>Passwort to access the device</description>
+			</parameter>
+			<parameter name="refreshInterval" type="integer" unit="s" min="1">
+				<label>Refresh Interval</label>
+				<description>Interval the device is polled in sec.</description>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+	<channel-group-type id="video">
+		<label>Video</label>
+		<channels>
+			<channel id="brightness" typeId="brightness"/>
+			<channel id="saturation" typeId="saturation"/>
+			<channel id="contrast" typeId="contrast"/>
+			<channel id="sharpness" typeId="sharpness"/>
+			<channel id="hue" typeId="hue"/>
+			<channel id="local_dimming" typeId="local_dimming"/>
+			<channel id="auto_picture_mode" typeId="auto_picture_mode"/>
+			<channel id="color_space" typeId="color_space"/>
+			<channel id="color_temperature" typeId="color_temperature"/>
+			<channel id="light_sensor" typeId="light_sensor"/>
+			<channel id="picture_mode" typeId="picture_mode"/>
+			<channel id="hdr_mode" typeId="hdr_mode"/>
+			<channel id="xtended_dynamic_range" typeId="xtended_dynamic_range"/>
+		</channels>
+	</channel-group-type>
+	<channel-group-type id="system">
+		<label>System</label>
+		<channels>
+			<channel id="power" typeId="power"/>
+			<channel id="current_input" typeId="current_input"/>
+		</channels>
+	</channel-group-type>
+
+	<channel-type id="brightness">
+		<item-type>Number</item-type>
+		<label>Brightness</label>
+		<state min="0" max="50" step="1" readOnly="false"/>
+	</channel-type>
+	<channel-type id="saturation">
+		<item-type>Number</item-type>
+		<label>Saturation</label>
+		<state min="0" max="100" step="1" readOnly="false"/>
+	</channel-type>
+	<channel-type id="contrast">
+		<item-type>Number</item-type>
+		<label>Contrast</label>
+		<state min="0" max="100" step="1" readOnly="false"/>
+	</channel-type>
+	<channel-type id="sharpness">
+		<item-type>Number</item-type>
+		<label>Sharpness</label>
+		<state min="0" max="100" step="1" readOnly="false"/>
+	</channel-type>
+	<channel-type id="hue">
+		<item-type>Number</item-type>
+		<label>Hue</label>
+		<state min="-50" max="50" step="1" readOnly="false"/>
+	</channel-type>
+	<channel-type id="local_dimming">
+		<item-type>String</item-type>
+		<label>Local Dimming</label>
+		<state readOnly="false">
+			<options>
+				<option value="off">Off</option>
+				<option value="low">Low</option>
+				<option value="medium">Medium</option>
+				<option value="high">High</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="xtended_dynamic_range">
+		<item-type>String</item-type>
+		<label>Xtended Dynamic Range</label>
+		<state readOnly="false">
+			<options>
+				<option value="off">Off</option>
+				<option value="low">Low</option>
+				<option value="medium">Medium</option>
+				<option value="high">High</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="auto_picture_mode">
+		<item-type>String</item-type>
+		<label>Auto picture mode</label>
+		<state readOnly="false">
+			<options>
+				<option value="auto">Auto</option>
+				<option value="auto24p">Auto (24p)</option>
+				<option value="off">Off</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="color_space">
+		<item-type>String</item-type>
+		<label>Color space</label>
+		<state readOnly="false">
+			<options>
+				<option value="auto">Auto</option>
+				<option value="sRgb/bt709">sRGB / bt709</option>
+				<option value="dci">DCI</option>
+				<option value="adobeRgb">Adobe RGB</option>
+				<option value="bt2020">bt2020</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="color_temperature">
+		<item-type>String</item-type>
+		<label>Color temperature</label>
+		<state readOnly="false">
+			<options>
+				<option value="cool">Cool</option>
+				<option value="neutral">Neutral</option>
+				<option value="warm">Warm</option>
+				<option value="expert1">Expert1</option>
+				<option value="expert2">Expert2</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="picture_mode">
+		<item-type>String</item-type>
+		<label>Picture mode</label>
+		<state readOnly="false">
+			<options>
+				<option value="vivid">Vivid</option>
+				<option value="standard">Standard</option>
+				<option value="custom">Custom</option>
+				<option value="cinemaPro">Cinema Pro</option>
+				<option value="cinemaHome">Cinema Home</option>
+				<option value="sports">Sports</option>
+				<option value="animation">Animation</option>
+				<option value="photoVivid">Photo Vivid</option>
+				<option value="photoStandard">Photo Standard</option>
+				<option value="photoCustom">Photo Custom</option>
+				<option value="game">Game</option>
+				<option value="graphics">Graphics</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="hdr_mode">
+		<item-type>String</item-type>
+		<label>HDR mode</label>
+		<state readOnly="false">
+			<options>
+				<option value="auto">Auto</option>
+				<option value="hdr10">HDR10</option>
+				<option value="hlg">HLG</option>
+				<option value="off">Off</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="light_sensor">
+		<item-type>Switch</item-type>
+		<label>Light sensor</label>
+		<state readOnly="false"/>
+	</channel-type>
+	<channel-type id="power">
+		<item-type>Switch</item-type>
+		<label>Power</label>
+		<state readOnly="false"/>
+	</channel-type>
+	<channel-type id="current_input">
+		<item-type>String</item-type>
+		<label>Current input</label>
+		<state readOnly="false"/>
+	</channel-type>
+</thing:thing-descriptions>
