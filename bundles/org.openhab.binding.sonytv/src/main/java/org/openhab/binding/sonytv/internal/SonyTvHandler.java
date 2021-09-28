@@ -31,12 +31,15 @@ import org.eclipse.jetty.http.HttpMethod;
 import org.openhab.binding.sonytv.internal.DTO.VideoOptionResponse;
 import org.openhab.binding.sonytv.internal.exceptions.ApiException;
 import org.openhab.binding.sonytv.internal.exceptions.ConnectionException;
+import org.openhab.binding.sonytv.internal.exceptions.UnexpectedResponseException;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.RefreshType;
+import org.openhab.core.types.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +76,10 @@ public class SonyTvHandler extends BaseThingHandler {
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
         logger.info("Received command {} for channel {}", command.toFullString(), channelUID.getAsString());
+
+        if (command instanceof RefreshType) {
+            return;
+        }
 
         if (channelUID.getGroupId() != null) {
             String target = null;
@@ -152,14 +159,14 @@ public class SonyTvHandler extends BaseThingHandler {
                             } catch (ConnectionException | ApiException e) {
                                 logger.error("Command failed: {}", e.getMessage(), e);
                             }
-                            break;
+                            return;
                         case CHANNEL_SYSTEM_CURRENT_INPUT:
                             try {
                                 sendSwitchInputCommand(command.toFullString());
                             } catch (ConnectionException | ApiException e) {
                                 logger.error("Command failed: {}", e.getMessage(), e);
                             }
-                            break;
+                            return;
                     }
                     break;
             }
@@ -234,18 +241,30 @@ public class SonyTvHandler extends BaseThingHandler {
         try {
             refreshPowerStatus();
             if (isActive) {
-                refreshCurrentInput();
-                refreshVideoOptions();
+                try {
+                    refreshCurrentInput();
+                    refreshVideoOptions();
+                } catch (ApiException e) {
+                    switch (e.getCode()) {
+                        case 40005: // Display is turned off
+                            break;
+                        default:
+                            throw e;
+                    }
+                }
             }
         } catch (ConnectionException e) {
             if (e.getCause() instanceof TimeoutException) {
-                logger.warn(e.getMessage(), e);
+                logger.warn(e.getMessage());
             } else {
                 updateStatus(ThingStatus.OFFLINE);
                 logger.error("Error during refresh: {}", e.getMessage(), e);
             }
             return;
         } catch (ApiException e) {
+            logger.error("Api error during refresh: code={}, message={}", e.getCode(), e.getMessage(), e);
+            return;
+        } catch (UnexpectedResponseException | java.lang.IllegalArgumentException e) {
             logger.error("Error during refresh: {}", e.getMessage(), e);
             return;
         }
@@ -284,13 +303,13 @@ public class SonyTvHandler extends BaseThingHandler {
         ApiResponse apiResponse = gson.fromJson(response.getContentAsString(), ApiResponse.class);
 
         if (apiResponse.error != null) {
-            throw new ApiException(apiResponse.error.toString());
+            throw new ApiException(apiResponse.error.get(1).getAsString(), apiResponse.error.get(0).getAsInt());
         }
 
         return apiResponse;
     }
 
-    protected void refreshVideoOptions() throws ConnectionException, ApiException {
+    protected void refreshVideoOptions() throws ConnectionException, ApiException, UnexpectedResponseException {
         JsonArray params = new JsonArray();
         params.add(new JsonObject());
 
@@ -299,62 +318,85 @@ public class SonyTvHandler extends BaseThingHandler {
         try {
             for (JsonElement optionJson : response.result.getAsJsonArray().get(0).getAsJsonArray()) {
                 VideoOptionResponse option = gson.fromJson(optionJson, VideoOptionResponse.class);
+                String channel;
+                State newState;
 
                 switch (option.target) {
                     case "brightness":
-                        updateState(CHANNEL_VIDEO_BRIGHTNESS, DecimalType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_BRIGHTNESS;
+                        newState = new DecimalType(option.currentValue);
                         break;
                     case "color":
-                        updateState(CHANNEL_VIDEO_SATURATION, DecimalType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_SATURATION;
+                        newState = new DecimalType(option.currentValue);
                         break;
                     case "contrast":
-                        updateState(CHANNEL_VIDEO_CONTRAST, DecimalType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_CONTRAST;
+                        newState = new DecimalType(option.currentValue);
                         break;
                     case "sharpness":
-                        updateState(CHANNEL_VIDEO_SHARPNESS, DecimalType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_SHARPNESS;
+                        newState = new DecimalType(option.currentValue);
                         break;
                     case "hue":
-                        updateState(CHANNEL_VIDEO_HUE, DecimalType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_HUE;
+                        newState = new DecimalType(option.currentValue);
                         break;
                     case "autoLocalDimming":
-                        updateState(CHANNEL_VIDEO_LOCAL_DIMMING, StringType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_LOCAL_DIMMING;
+                        newState = new StringType(option.currentValue);
                         break;
                     case "autoPictureMode":
-                        updateState(CHANNEL_VIDEO_AUTO_PICTURE_MODE, StringType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_AUTO_PICTURE_MODE;
+                        newState = new StringType(option.currentValue);
                         break;
                     case "colorSpace":
-                        updateState(CHANNEL_VIDEO_COLOR_SPACE, StringType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_COLOR_SPACE;
+                        newState = new StringType(option.currentValue);
                         break;
                     case "colorTemperature":
-                        updateState(CHANNEL_VIDEO_COLOR_TEMPERATURE, StringType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_COLOR_TEMPERATURE;
+                        newState = new StringType(option.currentValue);
                         break;
                     case "lightSensor":
-                        updateState(CHANNEL_VIDEO_LIGHT_SENSOR, OnOffType.from(option.currentValue.equals("on")));
+                        channel = CHANNEL_VIDEO_LIGHT_SENSOR;
+                        newState = OnOffType.from(option.currentValue.equals("on"));
                         break;
                     case "pictureMode":
-                        updateState(CHANNEL_VIDEO_PICTURE_MODE, StringType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_PICTURE_MODE;
+                        newState = new StringType(option.currentValue);
                         break;
                     case "hdrMode":
-                        updateState(CHANNEL_VIDEO_HDR_MODE, StringType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_HDR_MODE;
+                        newState = new StringType(option.currentValue);
                         break;
                     case "xtendedDynamicRange":
-                        updateState(CHANNEL_VIDEO_XTENDED_DYNAMIC_RANGE, StringType.valueOf(option.currentValue));
+                        channel = CHANNEL_VIDEO_XTENDED_DYNAMIC_RANGE;
+                        newState = new StringType(option.currentValue);
                         break;
+                    default:
+                        continue;
+                }
+
+                try {
+                    updateState(channel, newState);
+                } catch (java.lang.IllegalArgumentException e) {
+                    logger.error("Unable to update \"{}\" with value \"{}\"", channel, newState.toFullString(), e);
                 }
             }
         } catch (JsonSyntaxException e) {
-            throw new ApiException(e.getMessage());
+            throw new UnexpectedResponseException(e.getMessage());
         }
     }
 
-    protected void refreshCurrentInput() throws ConnectionException, ApiException {
+    protected void refreshCurrentInput() throws ConnectionException, ApiException, UnexpectedResponseException {
 
         ApiResponse response = dispatchRequest("avContent", "getPlayingContentInfo", 103, new JsonArray());
         String input;
         try {
             input = response.result.getAsJsonArray().get(0).getAsJsonObject().getAsJsonPrimitive("uri").getAsString();
         } catch (JsonSyntaxException e) {
-            throw new ApiException(e.getMessage());
+            throw new UnexpectedResponseException(e.getMessage());
         }
         String humanFriendlyInput;
         switch (input) {
@@ -384,14 +426,14 @@ public class SonyTvHandler extends BaseThingHandler {
         updateState(CHANNEL_SYSTEM_CURRENT_INPUT, StringType.valueOf(humanFriendlyInput));
     }
 
-    protected void refreshPowerStatus() throws ConnectionException, ApiException {
+    protected void refreshPowerStatus() throws ConnectionException, ApiException, UnexpectedResponseException {
         ApiResponse response = dispatchRequest("system", "getPowerStatus", 50, new JsonArray());
         String status;
         try {
             status = response.result.getAsJsonArray().get(0).getAsJsonObject().getAsJsonPrimitive("status")
                     .getAsString();
         } catch (JsonSyntaxException e) {
-            throw new ApiException(e.getMessage());
+            throw new UnexpectedResponseException(e.getMessage());
         }
 
         isActive = status.equalsIgnoreCase("active");
