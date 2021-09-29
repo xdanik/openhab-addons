@@ -282,7 +282,7 @@ public class SonyTvHandler extends BaseThingHandler {
         request.header(HttpHeader.CONTENT_TYPE, "application/json");
         request.header("X-Auth-PSK", config.apiKey);
         request.header("cache-control", "no-cache");
-        request.timeout(1000L, TimeUnit.MILLISECONDS);
+        request.timeout(1500L, TimeUnit.MILLISECONDS);
 
         JsonObject requestObject = new JsonObject();
         requestObject.addProperty("method", method);
