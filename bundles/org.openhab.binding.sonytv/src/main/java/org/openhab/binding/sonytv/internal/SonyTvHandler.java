@@ -304,7 +304,9 @@ public class SonyTvHandler extends BaseThingHandler {
         ApiResponse apiResponse = gson.fromJson(response.getContentAsString(), ApiResponse.class);
 
         if (apiResponse.error != null) {
-            throw new ApiException(apiResponse.error.get(1).getAsString(), apiResponse.error.get(0).getAsInt());
+            int errorCode = apiResponse.error.get(0).getAsInt();
+            String errorMessage = apiResponse.error.get(1).getAsString();
+            throw new ApiException("[" + errorCode + "] " + errorMessage, errorCode);
         }
 
         return apiResponse;
