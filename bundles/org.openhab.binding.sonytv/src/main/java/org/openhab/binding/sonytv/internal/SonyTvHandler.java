@@ -225,6 +225,7 @@ public class SonyTvHandler extends BaseThingHandler {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Api key not configured");
         }
 
+        httpClient.setConnectTimeout(300L);
         try {
             httpClient.start();
         } catch (Exception e) {
@@ -297,7 +298,7 @@ public class SonyTvHandler extends BaseThingHandler {
         try {
             response = request.send();
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
-            throw new ConnectionException(e.getMessage(), e);
+            throw new ConnectionException("Error during requesting \"" + method + "\": " + e.getMessage(), e);
         }
 
         ApiResponse apiResponse = gson.fromJson(response.getContentAsString(), ApiResponse.class);
