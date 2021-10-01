@@ -15,6 +15,7 @@ package org.openhab.binding.sonytv.internal;
 import static org.openhab.binding.sonytv.internal.SonyTvBindingConstants.*;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -62,7 +63,10 @@ public class SonyTvHandler extends BaseThingHandler {
         super(thing);
         httpClient = new HttpClient();
         gson = new Gson();
+        channelStates = new HashMap<>();
     }
+
+    protected long lastCommunicationMillis;
 
     protected Gson gson;
 
@@ -73,89 +77,114 @@ public class SonyTvHandler extends BaseThingHandler {
 
     protected Boolean isActive = false;
 
+    protected HashMap<ChannelUID, State> channelStates;
+
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
-        logger.info("Received command {} for channel {}", command.toFullString(), channelUID.getAsString());
+        logger.debug("Received command {} for channel {}", command.toFullString(), channelUID.getAsString());
 
         if (command instanceof RefreshType) {
+            if (channelStates.containsKey(channelUID)) {
+                State lastState = channelStates.get(channelUID);
+                if (lastState != null) {
+                    updateState(channelUID, lastState);
+                }
+            }
             return;
         }
 
         if (channelUID.getGroupId() != null) {
-            String target = null;
-            String value = null;
-
             switch (channelUID.getGroupId()) {
-                case CHANNEL_GROUP_VIDEO:
+                case CHANNEL_GROUP_VIDEO: {
+                    String target = null;
+                    String targetValue = null;
+                    State newState = null;
                     switch (channelUID.getId()) {
                         case CHANNEL_VIDEO_PICTURE_MODE:
                             target = "pictureMode";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = StringType.valueOf(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_BRIGHTNESS:
                             target = "brightness";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = StringType.valueOf(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_AUTO_PICTURE_MODE:
                             target = "autoPictureMode";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = StringType.valueOf(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_COLOR_SPACE:
                             target = "colorSpace";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = StringType.valueOf(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_COLOR_TEMPERATURE:
                             target = "colorTemperature";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = StringType.valueOf(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_HDR_MODE:
                             target = "hdrMode";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = StringType.valueOf(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_LIGHT_SENSOR:
                             target = "lightSensor";
-                            value = command.toFullString().equalsIgnoreCase("on") ? "on" : "off";
+                            targetValue = command.toFullString().equalsIgnoreCase("on") ? "on" : "off";
+                            newState = OnOffType.from(targetValue);
                             break;
                         case CHANNEL_VIDEO_LOCAL_DIMMING:
                             target = "autoLocalDimming";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = StringType.valueOf(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_SATURATION:
                             target = "color";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = new DecimalType(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_CONTRAST:
                             target = "contrast";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = new DecimalType(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_HUE:
                             target = "hue";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = new DecimalType(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_SHARPNESS:
                             target = "sharpness";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = new DecimalType(command.toFullString());
                             break;
                         case CHANNEL_VIDEO_XTENDED_DYNAMIC_RANGE:
                             target = "xtendedDynamicRange";
-                            value = command.toFullString();
+                            targetValue = command.toFullString();
+                            newState = StringType.valueOf(command.toFullString());
                             break;
                     }
-                    if (target != null && value != null) {
+                    if (target != null && targetValue != null && newState != null) {
                         try {
                             dispatchRequest("video", "setPictureQualitySettings", 12,
-                                    buildVideoSetParams(target, value));
+                                    buildVideoSetParams(target, targetValue));
+                            updateState(channelUID, newState);
                         } catch (ConnectionException | ApiException e) {
                             logger.error("Command failed: {}", e.getMessage(), e);
                         }
                         return;
                     }
                     break;
-                case CHANNEL_GROUP_SYSTEM:
+                }
+                case CHANNEL_GROUP_SYSTEM: {
                     switch (channelUID.getId()) {
                         case CHANNEL_SYSTEM_POWER:
                             try {
-                                sendPowerCommand(command.toFullString().equalsIgnoreCase("on"));
+                                boolean newState = command.toFullString().equalsIgnoreCase("on");
+                                sendPowerCommand(newState);
+                                updateState(channelUID, OnOffType.from(newState));
                             } catch (ConnectionException | ApiException e) {
                                 logger.error("Command failed: {}", e.getMessage(), e);
                             }
@@ -163,12 +192,14 @@ public class SonyTvHandler extends BaseThingHandler {
                         case CHANNEL_SYSTEM_CURRENT_INPUT:
                             try {
                                 sendSwitchInputCommand(command.toFullString());
+                                updateState(channelUID, StringType.valueOf(command.toFullString()));
                             } catch (ConnectionException | ApiException e) {
                                 logger.error("Command failed: {}", e.getMessage(), e);
                             }
                             return;
                     }
                     break;
+                }
             }
         }
         logger.warn("Ignoring command to unknown channel {}", channelUID.getId());
@@ -256,7 +287,10 @@ public class SonyTvHandler extends BaseThingHandler {
             }
         } catch (ConnectionException e) {
             if (e.getCause() instanceof TimeoutException) {
-                logger.warn(e.getMessage());
+                if (System.currentTimeMillis() - lastCommunicationMillis > 10000L) {
+                    logger.warn(e.getMessage());
+                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, "Response timeout");
+                }
             } else {
                 updateStatus(ThingStatus.OFFLINE);
                 logger.error("Error during refresh: {}", e.getMessage(), e);
@@ -300,6 +334,7 @@ public class SonyTvHandler extends BaseThingHandler {
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             throw new ConnectionException("Error during requesting \"" + method + "\": " + e.getMessage(), e);
         }
+        lastCommunicationMillis = System.currentTimeMillis();
 
         ApiResponse apiResponse = gson.fromJson(response.getContentAsString(), ApiResponse.class);
 
@@ -392,6 +427,12 @@ public class SonyTvHandler extends BaseThingHandler {
         }
     }
 
+    @Override
+    protected void updateState(ChannelUID channelUID, State state) {
+        this.channelStates.put(channelUID, state);
+        super.updateState(channelUID, state);
+    }
+
     protected void refreshCurrentInput() throws ConnectionException, ApiException, UnexpectedResponseException {
 
         ApiResponse response = dispatchRequest("avContent", "getPlayingContentInfo", 103, new JsonArray());
@@ -445,7 +486,7 @@ public class SonyTvHandler extends BaseThingHandler {
 
     @Override
     public void dispose() {
-        logger.warn("Disposing handler");
+        logger.debug("Disposing handler");
         if (refreshScheduler != null) {
             refreshScheduler.cancel(true);
         }
