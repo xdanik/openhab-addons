@@ -130,8 +130,6 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
             PS5ResponseParser responseParser = new PS5ResponseParser(response);
 
             updateState(CHANNEL_POWER, OnOffType.from(responseParser.getPowerStatus()));
-            updateState(CHANNEL_RUNNING_APPLICATION_ID, OnOffType.from(responseParser.getRunningApplicationId()));
-            updateState(CHANNEL_RUNNING_APPLICATION_NAME, OnOffType.from(responseParser.getRunningApplicationName()));
 
             updateStatus(ThingStatus.ONLINE);
         } catch (IOException e) {

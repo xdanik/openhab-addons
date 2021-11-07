@@ -31,6 +31,4 @@ public class PlayStationSimpleBindingConstants {
 
     // List of all Channel ids
     public static final String CHANNEL_POWER = "power";
-    public static final String CHANNEL_RUNNING_APPLICATION_NAME = "running_app_name";
-    public static final String CHANNEL_RUNNING_APPLICATION_ID = "running_app_id";
 }

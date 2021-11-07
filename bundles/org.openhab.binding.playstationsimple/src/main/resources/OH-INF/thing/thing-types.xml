@@ -10,8 +10,6 @@
 
 		<channels>
 			<channel id="power" typeId="power-channel"/>
-			<channel id="running_app_name" typeId="running-app-name-channel"/>
-			<channel id="running_app_id" typeId="running-app-id-channel"/>
 		</channels>
 
 		<config-description>
@@ -35,13 +33,5 @@
 	<channel-type id="power-channel">
 		<item-type>Switch</item-type>
 		<label>Power status</label>
-	</channel-type>
-	<channel-type id="running-app-name-channel">
-		<item-type>String</item-type>
-		<label>Running app name</label>
-	</channel-type>
-	<channel-type id="running-app-id-channel">
-		<item-type>String</item-type>
-		<label>Running app id</label>
 	</channel-type>
 </thing:thing-descriptions>
