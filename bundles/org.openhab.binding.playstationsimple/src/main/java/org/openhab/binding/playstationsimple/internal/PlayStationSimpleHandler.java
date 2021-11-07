@@ -14,16 +14,26 @@ package org.openhab.binding.playstationsimple.internal;
 
 import static org.openhab.binding.playstationsimple.internal.PlayStationSimpleBindingConstants.*;
 
+import java.io.IOException;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import DTO.PS5ResponseParser;
 
 /**
  * The {@link PlayStationSimpleHandler} is responsible for handling commands, which are
@@ -38,63 +48,113 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
 
     private @Nullable PlayStationSimpleConfiguration config;
 
+    @Nullable
+    private DatagramSocket udpSocket;
+
+    @Nullable
+    private InetAddress clientIp;
+
+    @Nullable
+    private String userCredential;
+
+    @Nullable
+    protected ScheduledFuture refreshScheduler;
+
+    private static final int PS5_PORT = 9302;
+
     public PlayStationSimpleHandler(Thing thing) {
         super(thing);
     }
 
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
-        if (CHANNEL_1.equals(channelUID.getId())) {
-            if (command instanceof RefreshType) {
-                // TODO: handle data refresh
-            }
-
-            // TODO: handle command
-
-            // Note: if communication with thing fails for some reason,
-            // indicate that by setting the status with detail information:
-            // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-            // "Could not control device at IP address x.x.x.x");
+        if (command instanceof RefreshType) {
+            return;
+        }
+        switch (channelUID.getId()) {
+            case CHANNEL_POWER:
+                try {
+                    sendRequest("WAKEUP * HTTP/1.1\nclient-type:vr\nauth-type:R\nmodel:w\napp-type:r\nuser-credential:"
+                            + userCredential + "\ndevice-discovery-protocol-version:00030010");
+                } catch (IOException e) {
+                    logger.error("Unable to send wake command: " + e.getMessage());
+                }
+                break;
+            default:
+                logger.warn("Ignoring command to unknown channel {}", channelUID.getId());
         }
     }
 
     @Override
     public void initialize() {
         config = getConfigAs(PlayStationSimpleConfiguration.class);
-
-        // TODO: Initialize the handler.
-        // The framework requires you to return from this method quickly. Also, before leaving this method a thing
-        // status from one of ONLINE, OFFLINE or UNKNOWN must be set. This might already be the real thing status in
-        // case you can decide it directly.
-        // In case you can not decide the thing status directly (e.g. for long running connection handshake using WAN
-        // access or similar) you should set status UNKNOWN here and then decide the real status asynchronously in the
-        // background.
-
-        // set the thing status to UNKNOWN temporarily and let the background task decide for the real status.
-        // the framework is then able to reuse the resources from the thing handler initialization.
-        // we set this upfront to reliably check status updates in unit tests.
         updateStatus(ThingStatus.UNKNOWN);
 
-        // Example for background initialization:
-        scheduler.execute(() -> {
-            boolean thingReachable = true; // <background task with long running initialization here>
-            // when done do:
-            if (thingReachable) {
-                updateStatus(ThingStatus.ONLINE);
-            } else {
-                updateStatus(ThingStatus.OFFLINE);
-            }
-        });
+        if (config == null || config.hostname.isEmpty()) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Hostname not set");
+            return;
+        }
+        try {
+            clientIp = InetAddress.getByName(config.hostname);
+        } catch (UnknownHostException e) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Invalid hostname: " + e.getMessage());
+            return;
+        }
 
-        // These logging types should be primarily used by bindings
-        // logger.trace("Example trace message");
-        // logger.debug("Example debug message");
-        // logger.warn("Example warn message");
+        if (config.password.isEmpty()) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Password not set");
+            return;
+        }
+        userCredential = config.password;
 
-        // Note: When initialization can NOT be done set the status with more details for further
-        // analysis. See also class ThingStatusDetail for all available status details.
-        // Add a description to give user information to understand why thing does not work as expected. E.g.
-        // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-        // "Can not access device as username and/or password are invalid");
+        try {
+            udpSocket = new DatagramSocket(0);
+            udpSocket.setSoTimeout(2000);
+        } catch (SocketException e) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
+                    "Unable to setup UDP socket: " + e.getMessage());
+            return;
+        }
+
+        refreshScheduler = scheduler.scheduleAtFixedRate(this::refresh, 0L, config.refreshInterval, TimeUnit.SECONDS);
+    }
+
+    protected void refresh() {
+        byte[] buffer = new byte[1024];
+        try {
+            sendStatusQuery();
+            DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
+            udpSocket.receive(responsePacket);
+            String response = new String(responsePacket.getData(), 0, responsePacket.getLength());
+            PS5ResponseParser responseParser = new PS5ResponseParser(response);
+
+            updateState(CHANNEL_POWER, OnOffType.from(responseParser.getPowerStatus()));
+            updateState(CHANNEL_RUNNING_APPLICATION_ID, OnOffType.from(responseParser.getRunningApplicationId()));
+            updateState(CHANNEL_RUNNING_APPLICATION_NAME, OnOffType.from(responseParser.getRunningApplicationName()));
+
+            updateStatus(ThingStatus.ONLINE);
+        } catch (IOException e) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+        }
+    }
+
+    protected void sendStatusQuery() throws IOException {
+        sendRequest("SRCH * HTTP/1.1\ndevice-discovery-protocol-version:00030010");
+    }
+
+    protected void sendRequest(String query) throws IOException {
+        byte[] buffer = query.getBytes(StandardCharsets.UTF_8);
+        DatagramPacket statusPacket = new DatagramPacket(buffer, buffer.length, clientIp, PS5_PORT);
+        udpSocket.send(statusPacket);
+    }
+
+    @Override
+    public void dispose() {
+        logger.debug("Disposing handler");
+        if (refreshScheduler != null) {
+            refreshScheduler.cancel(true);
+        }
+        super.dispose();
     }
 }

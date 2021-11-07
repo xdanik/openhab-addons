@@ -27,8 +27,10 @@ public class PlayStationSimpleBindingConstants {
     private static final String BINDING_ID = "playstationsimple";
 
     // List of all Thing Type UIDs
-    public static final ThingTypeUID THING_TYPE_SAMPLE = new ThingTypeUID(BINDING_ID, "sample");
+    public static final ThingTypeUID THING_TYPE_PS5 = new ThingTypeUID(BINDING_ID, "ps5");
 
     // List of all Channel ids
-    public static final String CHANNEL_1 = "channel1";
+    public static final String CHANNEL_POWER = "power";
+    public static final String CHANNEL_RUNNING_APPLICATION_NAME = "running_app_name";
+    public static final String CHANNEL_RUNNING_APPLICATION_ID = "running_app_id";
 }

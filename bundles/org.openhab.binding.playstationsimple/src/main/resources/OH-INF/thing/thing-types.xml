@@ -5,18 +5,13 @@
 	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
 
 	<!-- Sample Thing Type -->
-	<thing-type id="sample">
-		<!-- Comment this in for Things which need a Bridge to function.
-			<supported-bridge-type-refs>
-			<bridge-type-ref id="PlayStationSimpleBridge" />
-			</supported-bridge-type-refs>
-		-->
-
-		<label>PlayStationSimple Binding Thing</label>
-		<description>Sample thing for PlayStationSimple Binding</description>
+	<thing-type id="ps5">
+		<label>PlayStation 5</label>
 
 		<channels>
-			<channel id="channel1" typeId="sample-channel"/>
+			<channel id="power" typeId="power-channel"/>
+			<channel id="running_app_name" typeId="running-app-name-channel"/>
+			<channel id="running_app_id" typeId="running-app-id-channel"/>
 		</channels>
 
 		<config-description>
@@ -37,10 +32,16 @@
 		</config-description>
 	</thing-type>
 
-	<!-- Sample Channel Type -->
-	<channel-type id="sample-channel">
-		<item-type>Number:Temperature</item-type>
-		<label>Example Temperature</label><!-- Use uppercase words, except prepositions. 2-3 words, max 25 chars -->
-		<description>Sample channel for PlayStationSimple Binding</description>
+	<channel-type id="power-channel">
+		<item-type>Switch</item-type>
+		<label>Power status</label>
+	</channel-type>
+	<channel-type id="running-app-name-channel">
+		<item-type>String</item-type>
+		<label>Running app name</label>
+	</channel-type>
+	<channel-type id="running-app-id-channel">
+		<item-type>String</item-type>
+		<label>Running app id</label>
 	</channel-type>
 </thing:thing-descriptions>
