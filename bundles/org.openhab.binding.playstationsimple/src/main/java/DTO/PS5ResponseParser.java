@@ -1,6 +1,12 @@
 package DTO;
 
+import org.openhab.binding.playstationsimple.internal.PlayStationSimpleHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class PS5ResponseParser {
+    private final Logger logger = LoggerFactory.getLogger(PlayStationSimpleHandler.class);
+
     protected boolean powerStatus;
     protected String statusLine;
 

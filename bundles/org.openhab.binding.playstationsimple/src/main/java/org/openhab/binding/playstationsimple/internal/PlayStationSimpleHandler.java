@@ -61,6 +61,7 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
     protected ScheduledFuture refreshScheduler;
 
     private static final int PS5_PORT = 9302;
+    private static final int PS5_TIMEOUT = 10000;
 
     public PlayStationSimpleHandler(Thing thing) {
         super(thing);
@@ -110,7 +111,7 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
 
         try {
             udpSocket = new DatagramSocket(0);
-            udpSocket.setSoTimeout(2000);
+            udpSocket.setSoTimeout(PS5_TIMEOUT);
         } catch (SocketException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                     "Unable to setup UDP socket: " + e.getMessage());
@@ -125,12 +126,18 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
         try {
             sendStatusQuery();
             DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
-            udpSocket.receive(responsePacket);
-            String response = new String(responsePacket.getData(), 0, responsePacket.getLength());
+            String response;
+            long lastCommunicationMillis = System.currentTimeMillis();
+            do {
+                if (System.currentTimeMillis() - lastCommunicationMillis > PS5_TIMEOUT) {
+                    throw new IOException("Timeout reached");
+                }
+                udpSocket.receive(responsePacket);
+                response = new String(responsePacket.getData(), 0, responsePacket.getLength());
+            } while (!response.startsWith("HTTP"));
             PS5ResponseParser responseParser = new PS5ResponseParser(response);
 
             updateState(CHANNEL_POWER, OnOffType.from(responseParser.getPowerStatus()));
-
             updateStatus(ThingStatus.ONLINE);
         } catch (IOException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
