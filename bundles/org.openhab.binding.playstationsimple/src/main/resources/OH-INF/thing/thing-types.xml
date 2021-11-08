@@ -18,10 +18,10 @@
 				<label>Hostname</label>
 				<description>Hostname or IP address of the device</description>
 			</parameter>
-			<parameter name="password" type="text" required="true">
+			<parameter name="userCredentials" type="text" required="true">
 				<context>password</context>
-				<label>Password</label>
-				<description>Passwort to access the device</description>
+				<label>user-credential</label>
+				<description>"user-credential" obtained from tcpdump/Wireshark during wakeup command from RemotePlay</description>
 			</parameter>
 			<parameter name="refreshInterval" type="integer" unit="s" min="1">
 				<label>Refresh Interval</label>

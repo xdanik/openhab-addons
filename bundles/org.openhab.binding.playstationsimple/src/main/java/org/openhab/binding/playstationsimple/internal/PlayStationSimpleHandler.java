@@ -46,8 +46,6 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
 
     private final Logger logger = LoggerFactory.getLogger(PlayStationSimpleHandler.class);
 
-    private @Nullable PlayStationSimpleConfiguration config;
-
     @Nullable
     private DatagramSocket udpSocket;
 
@@ -58,7 +56,7 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
     private String userCredential;
 
     @Nullable
-    protected ScheduledFuture refreshScheduler;
+    protected ScheduledFuture<?> refreshScheduler;
 
     private static final int PS5_PORT = 9302;
     private static final int PS5_TIMEOUT = 10000;
@@ -88,7 +86,8 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
 
     @Override
     public void initialize() {
-        config = getConfigAs(PlayStationSimpleConfiguration.class);
+        @Nullable
+        PlayStationSimpleConfiguration config = getConfigAs(PlayStationSimpleConfiguration.class);
         updateStatus(ThingStatus.UNKNOWN);
 
         if (config == null || config.hostname.isEmpty()) {
@@ -103,38 +102,50 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
             return;
         }
 
-        if (config.password.isEmpty()) {
+        if (config.userCredentials.isEmpty()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "Password not set");
             return;
         }
-        userCredential = config.password;
+        userCredential = config.userCredentials;
 
         try {
             udpSocket = new DatagramSocket(0);
             udpSocket.setSoTimeout(PS5_TIMEOUT);
+            udpSocket.setBroadcast(false);
         } catch (SocketException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
                     "Unable to setup UDP socket: " + e.getMessage());
             return;
         }
 
-        refreshScheduler = scheduler.scheduleAtFixedRate(this::refresh, 0L, config.refreshInterval, TimeUnit.SECONDS);
+        refreshScheduler = scheduler.scheduleWithFixedDelay(this::refresh, 0L, config.refreshInterval,
+                TimeUnit.SECONDS);
     }
 
     protected void refresh() {
-        byte[] buffer = new byte[1024];
+        if (udpSocket == null) {
+            return;
+        }
+        byte[] buffer = new byte[512];
         try {
             sendStatusQuery();
             DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
             String response;
             long lastCommunicationMillis = System.currentTimeMillis();
-            do {
+            while (true) {
                 if (System.currentTimeMillis() - lastCommunicationMillis > PS5_TIMEOUT) {
                     throw new IOException("Timeout reached");
                 }
                 udpSocket.receive(responsePacket);
+                if (!responsePacket.getAddress().equals(clientIp)) {
+                    continue;
+                }
                 response = new String(responsePacket.getData(), 0, responsePacket.getLength());
-            } while (!response.startsWith("HTTP"));
+                if (!response.startsWith("HTTP")) {
+                    continue;
+                }
+                break;
+            }
             PS5ResponseParser responseParser = new PS5ResponseParser(response);
 
             updateState(CHANNEL_POWER, OnOffType.from(responseParser.getPowerStatus()));
@@ -158,7 +169,7 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
     public void dispose() {
         logger.debug("Disposing handler");
         if (refreshScheduler != null) {
-            refreshScheduler.cancel(true);
+            refreshScheduler.cancel(false);
         }
         super.dispose();
     }
