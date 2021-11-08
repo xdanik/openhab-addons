@@ -58,8 +58,10 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
     @Nullable
     protected ScheduledFuture<?> refreshScheduler;
 
+    private OnOffType currentPower = OnOffType.OFF;
+
     private static final int PS5_PORT = 9302;
-    private static final int PS5_TIMEOUT = 10000;
+    private static final int PS5_TIMEOUT = 5000;
 
     public PlayStationSimpleHandler(Thing thing) {
         super(thing);
@@ -67,20 +69,36 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
 
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
-        if (command instanceof RefreshType) {
-            return;
-        }
         switch (channelUID.getId()) {
             case CHANNEL_POWER:
-                try {
-                    sendRequest("WAKEUP * HTTP/1.1\nclient-type:vr\nauth-type:R\nmodel:w\napp-type:r\nuser-credential:"
-                            + userCredential + "\ndevice-discovery-protocol-version:00030010");
-                } catch (IOException e) {
-                    logger.error("Unable to send wake command: " + e.getMessage());
+                if (command instanceof RefreshType) {
+                    updateState(channelUID, currentPower);
+                    return;
                 }
+                if (command instanceof OnOffType) {
+                    OnOffType onOff = (OnOffType) command;
+                    if (currentPower != onOff) {
+                        currentPower = onOff;
+                        if (currentPower.equals(OnOffType.ON)) {
+                            wakePS5();
+                        } else if (currentPower.equals(OnOffType.OFF)) {
+                            logger.warn("Standby command is not yet supported.");
+                        }
+                    }
+                }
+
                 break;
             default:
                 logger.warn("Ignoring command to unknown channel {}", channelUID.getId());
+        }
+    }
+
+    protected void wakePS5() {
+        try {
+            sendRequest("WAKEUP * HTTP/1.1\nclient-type:vr\nauth-type:R\nmodel:w\napp-type:r\nuser-credential:"
+                    + userCredential + "\ndevice-discovery-protocol-version:00030010");
+        } catch (IOException e) {
+            logger.error("Unable to send wake command: " + e.getMessage());
         }
     }
 
@@ -148,7 +166,8 @@ public class PlayStationSimpleHandler extends BaseThingHandler {
             }
             PS5ResponseParser responseParser = new PS5ResponseParser(response);
 
-            updateState(CHANNEL_POWER, OnOffType.from(responseParser.getPowerStatus()));
+            currentPower = OnOffType.from(responseParser.getPowerStatus());
+            updateState(CHANNEL_POWER, currentPower);
             updateStatus(ThingStatus.ONLINE);
         } catch (IOException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
