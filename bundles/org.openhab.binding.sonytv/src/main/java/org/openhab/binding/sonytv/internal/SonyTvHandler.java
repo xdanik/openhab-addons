@@ -332,7 +332,8 @@ public class SonyTvHandler extends BaseThingHandler {
         try {
             response = request.send();
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
-            throw new ConnectionException("Error during requesting \"" + method + "\": " + e.getMessage(), e);
+            throw new ConnectionException(
+                    "Error during requesting \"" + uri.toString() + "\"@\"" + method + "\" " + e.getMessage(), e);
         }
         lastCommunicationMillis = System.currentTimeMillis();
 
