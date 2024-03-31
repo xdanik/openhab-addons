@@ -49,4 +49,5 @@ public class SonyTvBindingConstants {
 
     public static final String CHANNEL_SYSTEM_POWER = CHANNEL_GROUP_SYSTEM + "#power";
     public static final String CHANNEL_SYSTEM_CURRENT_INPUT = CHANNEL_GROUP_SYSTEM + "#current_input";
+    public static final String CHANNEL_SYSTEM_DISPLAY_OFF = CHANNEL_GROUP_SYSTEM + "#display_off";
 }

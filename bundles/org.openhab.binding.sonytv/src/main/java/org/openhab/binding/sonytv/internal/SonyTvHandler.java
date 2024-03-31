@@ -197,6 +197,15 @@ public class SonyTvHandler extends BaseThingHandler {
                                 logger.error("Command failed: {}", e.getMessage(), e);
                             }
                             return;
+                        case CHANNEL_SYSTEM_DISPLAY_OFF:
+                            try {
+                                boolean newState = command.toFullString().equalsIgnoreCase("on");
+                                sendDisplayOffCommand(newState);
+                                updateState(channelUID, OnOffType.from(newState));
+                            } catch (ConnectionException | ApiException e) {
+                                logger.error("Command failed: {}", e.getMessage(), e);
+                            }
+                            return;
                     }
                     break;
                 }
@@ -211,6 +220,14 @@ public class SonyTvHandler extends BaseThingHandler {
         standByObject.addProperty("status", state);
         params.add(standByObject);
         dispatchRequest("system", "setPowerStatus", 55, params);
+    }
+
+    protected void sendDisplayOffCommand(Boolean state) throws ConnectionException, ApiException {
+        JsonArray params = new JsonArray();
+        JsonObject arguments = new JsonObject();
+        arguments.addProperty("mode", state ? "pictureOff" : "off");
+        params.add(arguments);
+        dispatchRequest("system", "setPowerSavingMode", 51, params);
     }
 
     protected void sendSwitchInputCommand(String input) throws ConnectionException, ApiException {
@@ -274,6 +291,7 @@ public class SonyTvHandler extends BaseThingHandler {
             refreshPowerStatus();
             if (isActive) {
                 try {
+                    refreshDisplayOffStatus();
                     refreshCurrentInput();
                     refreshVideoOptions();
                 } catch (ApiException e) {
@@ -435,11 +453,17 @@ public class SonyTvHandler extends BaseThingHandler {
     }
 
     protected void refreshCurrentInput() throws ConnectionException, ApiException, UnexpectedResponseException {
-
-        ApiResponse response = dispatchRequest("avContent", "getPlayingContentInfo", 103, new JsonArray());
         String input;
         try {
+            ApiResponse response = dispatchRequest("avContent", "getPlayingContentInfo", 103, new JsonArray());
             input = response.result.getAsJsonArray().get(0).getAsJsonObject().getAsJsonPrimitive("uri").getAsString();
+        } catch (ApiException e) {
+            // case when no input is selected (TV in menu / build-in apps)
+            if (e.getCode() == 7) {
+                input = "unknown";
+            } else {
+                throw e;
+            }
         } catch (JsonSyntaxException e) {
             throw new UnexpectedResponseException(e.getMessage());
         }
@@ -483,6 +507,19 @@ public class SonyTvHandler extends BaseThingHandler {
 
         isActive = status.equalsIgnoreCase("active");
         updateState(CHANNEL_SYSTEM_POWER, OnOffType.from(isActive));
+    }
+
+    protected void refreshDisplayOffStatus() throws ConnectionException, ApiException, UnexpectedResponseException {
+        ApiResponse response = dispatchRequest("system", "getPowerSavingMode", 51, new JsonArray());
+        String mode;
+        try {
+            mode = response.result.getAsJsonArray().get(0).getAsJsonObject().getAsJsonPrimitive("mode").getAsString();
+        } catch (JsonSyntaxException e) {
+            throw new UnexpectedResponseException(e.getMessage());
+        }
+
+        boolean isDisplayOff = mode.equalsIgnoreCase("pictureOff");
+        updateState(CHANNEL_SYSTEM_DISPLAY_OFF, OnOffType.from(isDisplayOff));
     }
 
     @Override

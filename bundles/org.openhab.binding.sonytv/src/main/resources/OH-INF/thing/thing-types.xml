@@ -54,6 +54,7 @@
 		<channels>
 			<channel id="power" typeId="power"/>
 			<channel id="current_input" typeId="current_input"/>
+			<channel id="display_off" typeId="display_off"/>
 		</channels>
 	</channel-group-type>
 
@@ -183,6 +184,11 @@
 	<channel-type id="power">
 		<item-type>Switch</item-type>
 		<label>Power</label>
+		<state readOnly="false"/>
+	</channel-type>
+	<channel-type id="display_off">
+		<item-type>Switch</item-type>
+		<label>Display off</label>
 		<state readOnly="false"/>
 	</channel-type>
 	<channel-type id="current_input">
